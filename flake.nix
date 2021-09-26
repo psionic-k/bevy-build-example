@@ -43,5 +43,8 @@
             rust-analyzer
           ];
         };
+        hydraJobs = {
+          build = defaultPackage;
+        };
       });
 }
