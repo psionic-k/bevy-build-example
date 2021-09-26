@@ -7,44 +7,51 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, rustpkgs, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ rustpkgs.overlay ];
-        };
-        rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
-        rustPlatform = with pkgs; makeRustPlatform {
-          rustc = rust;
-          cargo = rust;
-        };
-      in
-      rec {
-         packages = {
-           hello = rustPlatform.buildRustPackage {
-             name = "hello";
-             cargoLock = {
-               lockFile = ./Cargo.lock;
-             };
-             src = ./.;
-             nativeBuildInputs = with pkgs; [
-               pkgconfig
-             ];
-             buildInputs = with pkgs; [
-               alsa-lib
-               udev
-             ];
-           };
-         };
-         defaultPackage = packages.hello;
-         devShell = with pkgs; mkShell {
-          buildInputs = [
-            rust
-            rust-analyzer
-          ];
-        };
-        hydraJobs = {
-          build = defaultPackage;
-        };
-      });
-}
+    let
+      systems = [
+        "x86_64-linux"
+        "i686-linux"
+      ];
+    in
+    flake-utils.lib.eachSystem systems
+      (system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rustpkgs.overlay ];
+          };
+          rust = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+          rustPlatform = with pkgs; makeRustPlatform {
+            rustc = rust;
+            cargo = rust;
+          };
+        in
+        rec {
+          packages = {
+            hello = rustPlatform.buildRustPackage {
+              name = "hello";
+              cargoLock = {
+                lockFile = ./Cargo.lock;
+              };
+              src = ./.;
+              nativeBuildInputs = with pkgs; [
+                pkgconfig
+              ];
+              buildInputs = with pkgs; [
+                alsa-lib
+                udev
+              ];
+            };
+          };
+          defaultPackage = packages.hello;
+          devShell = with pkgs; mkShell {
+            buildInputs = [
+              rust
+              rust-analyzer
+            ];
+          };
+          hydraJobs = {
+            build = defaultPackage;
+          };
+        });
+    }
