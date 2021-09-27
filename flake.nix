@@ -29,18 +29,6 @@
 
           rust = pkgs.rust-bin.stable."1.55.0".default;
 
-          rustPlatform = pkgs.makeRustPlatform {
-            rustc = rust;
-            cargo = rust;
-          };
-          nativeBuildInputs = with pkgs; [
-            pkgconfig
-          ];
-          buildInputs = with pkgs; [
-            alsa-lib
-            udev
-          ];
-
           mkOverride = name: { buildInputs ? [ ], nativeBuildInputs ? [ ] }:
             pkgs.rustBuilder.rustLib.makeOverride {
               name = name;
@@ -76,24 +64,12 @@
           };
         in
         rec {
-          packages = {
-            # hello = rustPlatform.buildRustPackage {
-            #   name = "hello";
-            #   cargoLock = {
-            #     lockFile = ./Cargo.lock;
-            #   };
-            #   src = ./.;
-            #   inherit buildInputs nativeBuildInputs;
-            # };
-            hello = rustPkgs.workspace.hello { };
-          };
+          packages = nixpkgs.lib.mapAttrs (name: value: value {}) rustPkgs.workspace;
           defaultPackage = packages.hello;
-          devShell = with pkgs; mkShell {
-            nativeBuildInputs = defaultPackage.nativeBuildInputs;
-            buildInputs = defaultPackage.buildInputs ++ [
+          devShell = pkgs.mkShell {
+            buildInputs = [
+              (import inputs.cargo2nix {inherit system;}).package
               rust
-              cargo2nix.package
-              rust-analyzer
             ];
           };
           hydraJobs = {
