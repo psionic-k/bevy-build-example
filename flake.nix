@@ -1,45 +1,41 @@
 {
-  description = "Yliaster";
+  description = "Bevy minimal project";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/release-21.11";
     flake-utils.url = "github:numtide/flake-utils";
-
-    rust-overlay.url = "github:oxalica/rust-overlay";
     cargo2nix.url = "github:cargo2nix/cargo2nix";
-    cargo2nix.flake = false;
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, cargo2nix, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, cargo2nix, ... }@inputs:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            (import "${cargo2nix}/overlay")
-            rust-overlay.overlay
+          overlays = [ cargo2nix.overlay ];
+        };
+
+        rustPkgs = pkgs.rustBuilder.makePackageSet {
+          rustChannel = "1.60.0";
+          packageFun = import ./Cargo.nix;
+
+          packageOverrides = pkgs: pkgs.rustBuilder.overrides.all ++ [
+            (pkgs.rustBuilder.rustLib.makeOverride {
+              name = "alsa-sys";
+              overrideAttrs = drv: {
+                propagatedBuildInputs = drv.propagatedBuildInputs or [ ] ++ [
+                  pkgs.alsa-lib
+                ];
+              };
+            })
           ];
         };
-
-        rustChannel = "1.55.0";
-
-        rust = pkgs.rust-bin.stable.${rustChannel}.default;
-        rustPkgs = pkgs.rustBuilder.makePackageSet' {
-          inherit rustChannel;
-          packageFun = import ./Cargo.nix;
-        };
+        workspaceShell = rustPkgs.workspaceShell { };
       in
       rec {
         inherit rustPkgs;
-        packages = {
-          cargo2nix = (import cargo2nix { inherit system; }).package;
-        } // builtins.mapAttrs (name: value: value { }) rustPkgs.workspace;
-        defaultPackage = packages.hello;
-        devShell = pkgs.mkShell {
-          buildInputs = [
-            packages.cargo2nix
-            rust
-          ];
-        };
+        packages = builtins.mapAttrs (name: value: value { }) rustPkgs.workspace;
+        defaultPackage = packages.hello.bin;
+        devShell = workspaceShell;
       });
 }
